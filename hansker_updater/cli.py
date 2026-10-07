@@ -139,6 +139,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def cmd_probe(_args: argparse.Namespace) -> int:
+    print(
+        "WARNING: probe opens a C9 diagnostic session. On the validated mouse, "
+        "normal input temporarily stops until the connection mode is toggled or the mouse is power-cycled."
+    )
+    print("No firmware commit or ISP entry is performed by probe.")
     version = probe_version()
     if version is None:
         return 2
@@ -146,6 +151,10 @@ def cmd_probe(_args: argparse.Namespace) -> int:
         print(f"status: already at target {TARGET_VERSION}")
     else:
         print(f"status: update available -> {TARGET_VERSION}")
+    print(
+        "POST-PROBE: if mouse input is inactive, unplug USB-C, toggle away from Wired "
+        "and back to Wired, wait about 10 seconds, then reconnect."
+    )
     return 0
 
 
@@ -322,7 +331,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ignore-openers", action="store_true", help="do not fail when another process has hidraw open")
     p.set_defaults(func=cmd_doctor)
 
-    p = sub.add_parser("probe", help="read current firmware version; never commits or enters ISP")
+    p = sub.add_parser(
+        "probe",
+        help="read firmware version; no commit/ISP, but may temporarily suppress mouse input",
+    )
     p.set_defaults(func=cmd_probe)
 
     p = sub.add_parser("isp-status", help="read-only check for the 0603:1020 ISP bootloader via raw USB")

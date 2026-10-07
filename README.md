@@ -53,29 +53,107 @@ For Ubuntu 24.04, importing directly from the official macOS DMG also needs 7-Zi
 sudo apt install 7zip
 ```
 
-## Import the official firmware resources
+## Get the official v2.23 updater and import its firmware
 
-Download Hansker's official updater yourself. Then import the required files locally:
+Hansker publishes the macOS v2.23 updater as a GitHub release. This project does
+**not** redistribute that DMG or the firmware payloads inside it.
+
+As of the hardware validation documented here, the official release is:
+
+```text
+https://github.com/hanskerdesign/firmware-updater/releases/tag/v2.23
+```
+
+Download the release asset directly with `curl`:
+
+```bash
+mkdir -p ~/Downloads
+curl -fL --retry 3 --retry-delay 1 \
+    https://github.com/hanskerdesign/firmware-updater/releases/download/v2.23/HanskerFirmwareUpdater.dmg \
+    -o ~/Downloads/HanskerFirmwareUpdater.dmg
+```
+
+Verify the DMG before extracting anything:
+
+```bash
+printf '%s  %s\n' \
+    6bac5d6d0c00b2674accb3413752249d328f185197f24149467fd03e6ae1dbcc \
+    "$HOME/Downloads/HanskerFirmwareUpdater.dmg" \
+    | sha256sum -c -
+```
+
+There is also a checked-in helper that performs exactly that download and hash
+verification:
+
+```bash
+./scripts/fetch-official-v2.23.sh
+```
+
+### Automatic extraction/import
+
+On Ubuntu 24.04 install 7-Zip once:
+
+```bash
+sudo apt install 7zip
+```
+
+Then let the updater extract the DMG, locate the two required resources, verify
+their hashes, and copy them into the ignored local vendor directory:
 
 ```bash
 ./hansker-fw import-resources ~/Downloads/HanskerFirmwareUpdater.dmg
 ```
 
-In a source checkout this stores only the verified files under:
+The resulting local-only files are:
 
 ```text
 .vendor/v2.23/firmware.bin
 .vendor/v2.23/packets_performance.json
 ```
 
-`.vendor/` is ignored by Git. The repository never needs to redistribute those files.
+`.vendor/` is ignored by Git. `packets_performance.json` contains the main
+firmware bytes as C9/CB packets, so it is deliberately treated as vendor
+firmware material too.
 
-Known-good hashes are recorded in `VENDOR_SHA256SUMS`.
+Expected hashes are recorded in `VENDOR_SHA256SUMS` and are rechecked whenever
+the updater loads these files.
 
-You can also import from an already-extracted updater directory:
+### Manual extraction
+
+If you want to inspect the official updater yourself instead of letting
+`import-resources` use 7-Zip internally:
+
+```bash
+rm -rf ~/Downloads/HanskerFirmwareUpdater-extracted
+mkdir -p ~/Downloads/HanskerFirmwareUpdater-extracted
+
+7zz x -y \
+    -o"$HOME/Downloads/HanskerFirmwareUpdater-extracted" \
+    "$HOME/Downloads/HanskerFirmwareUpdater.dmg"
+```
+
+Some Ubuntu installations expose the command as `7z` instead of `7zz`; either
+works with the importer. Locate the relevant vendor files with:
+
+```bash
+find ~/Downloads/HanskerFirmwareUpdater-extracted -type f \
+    \( -name firmware.bin -o -name packets_performance.json \) \
+    -print
+```
+
+Then import from the extracted directory. The importer searches recursively,
+so you do not need to depend on the application bundle's internal path:
 
 ```bash
 ./hansker-fw import-resources ~/Downloads/HanskerFirmwareUpdater-extracted
+```
+
+If you want to verify the two extracted files manually, their expected hashes
+are:
+
+```text
+b932769f06425db7243db17f7ba0464fe8bae6123e3881dcb897c9cf78b76ba4  firmware.bin
+c4e867ec0b2a9ba32d7129ec560badd3bae2959f48b7d653036a793f1c7252ee  packets_performance.json
 ```
 
 To use another local resource directory, set:
@@ -83,6 +161,32 @@ To use another local resource directory, set:
 ```bash
 export HANSKER_FW_RESOURCE_DIR="$HOME/.local/share/hansker-linux-fw-unofficial/v2.23"
 ```
+
+## Fresh-clone quick start
+
+For a normal update, `probe` is optional. Because the validated mouse temporarily
+stops producing input after a probe, the shortest path is to import the official
+resources, run the safety checks, and flash without probing first:
+
+```bash
+uv sync
+sudo apt install 7zip
+
+./scripts/fetch-official-v2.23.sh
+./hansker-fw import-resources ~/Downloads/HanskerFirmwareUpdater.dmg
+./scripts/test.sh
+sudo ./hansker-fw doctor
+sudo ./hansker-fw flash
+```
+
+After success, if the mouse enumerates but does not move the cursor, unplug it,
+toggle away from **Wired** and back to **Wired**, wait about 10 seconds, then
+reconnect. This exact sequence restored both wired and wireless operation on the
+first validated Linux update.
+
+Use `probe` only when you specifically want to read the current firmware version.
+Its C9 query does not commit firmware, but it has a confirmed temporary input
+side effect on the validated unit.
 
 ## Normal update
 
@@ -104,7 +208,18 @@ Read the current firmware version without committing or entering ISP:
 sudo ./hansker-fw probe
 ```
 
-If you ran `probe`, unplug the mouse for at least 5 seconds and reconnect it directly before flashing so the abandoned C9 session is reset.
+> **Probe side effect:** on the physically validated mouse, `probe` reliably
+> returns the correct version (`MS1000V2.23H`) but then normal mouse input stops.
+> This is because the version query opens a C9 session and intentionally drops
+> the handles without sending the dangerous commit command. Toggling the mouse
+> out of **Wired** mode and back, or doing a cold power-cycle, restores input.
+
+After any `probe`, reset the mouse before flashing or continuing normal use:
+
+1. unplug USB-C;
+2. toggle away from **Wired** and back to **Wired**;
+3. wait about 10 seconds;
+4. reconnect USB-C directly.
 
 Then flash:
 

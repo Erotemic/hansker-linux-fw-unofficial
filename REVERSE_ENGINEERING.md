@@ -58,6 +58,18 @@ firmware version: MS1000V2.23H
 
 The query intentionally never sends `05 c9 70` and never sends ISP-enter `05 75`.
 
+### Confirmed probe side effect on v2.23H
+
+After the successful update, a second explicit Linux probe again returned
+`MS1000V2.23H`. Immediately afterward, the mouse remained enumerated as
+`258a:0136` but emitted no normal input reports. Toggling connection modes
+restored both wireless and wired operation without another firmware write.
+
+Therefore `probe` is non-committing but **not operationally side-effect-free** on
+the validated unit. Treat it as a diagnostic that may temporarily disconnect
+mouse input. After probing, toggle away from Wired and back (or perform a cold
+power-cycle) before normal use or before starting a firmware update.
+
 ## C9/CB readiness behavior
 
 `wait_for_ready_byte` behavior recovered from the updater implementation:
@@ -204,3 +216,15 @@ packets_performance.json
 ```
 
 The packet capture contains main-firmware bytes, so both are treated as vendor firmware material. Users extract them locally from Hansker's official updater. The importer verifies the known SHA-256 values in `VENDOR_SHA256SUMS` before the updater can use them.
+
+The v2.23 DMG used for the validated update came from Hansker's public GitHub
+release asset:
+
+```text
+https://github.com/hanskerdesign/firmware-updater/releases/download/v2.23/HanskerFirmwareUpdater.dmg
+SHA256 6bac5d6d0c00b2674accb3413752249d328f185197f24149467fd03e6ae1dbcc
+```
+
+On Linux, `7zz x HanskerFirmwareUpdater.dmg` exposes the application bundle.
+The required `firmware.bin` and `packets_performance.json` are located
+recursively by the importer rather than relying on a fixed bundle path.

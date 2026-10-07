@@ -3,5 +3,6 @@
 b932769f06425db7243db17f7ba0464fe8bae6123e3881dcb897c9cf78b76ba4  firmware.bin
 c4e867ec0b2a9ba32d7129ec560badd3bae2959f48b7d653036a793f1c7252ee  packets_performance.json
 
-# Official GitHub release DMG observed during reverse engineering.
+# Official Hansker GitHub release v2.23:
+# https://github.com/hanskerdesign/firmware-updater/releases/download/v2.23/HanskerFirmwareUpdater.dmg
 6bac5d6d0c00b2674accb3413752249d328f185197f24149467fd03e6ae1dbcc  HanskerFirmwareUpdater.dmg

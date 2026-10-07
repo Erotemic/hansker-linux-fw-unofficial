@@ -14,6 +14,17 @@ class TestCli(unittest.TestCase):
         ):
             self.assertEqual(cli.main(["plan"]), 0)
 
+
+    def test_probe_warns_about_input_side_effect(self):
+        with mock.patch.object(cli, "probe_version", return_value="MS1000V2.23H"), mock.patch(
+            "builtins.print"
+        ) as print_mock:
+            self.assertEqual(cli.main(["probe"]), 0)
+        output = "\n".join(" ".join(str(v) for v in call.args) for call in print_mock.call_args_list)
+        self.assertIn("temporarily", output)
+        self.assertIn("toggle away from Wired", output)
+        self.assertIn("already at target", output)
+
     def test_isp_status_is_read_only(self):
         loc = cli.find_isp_location.__globals__["UsbLocation"](1, 30, 0)
         with mock.patch.object(cli, "find_isp_location", return_value=loc):
