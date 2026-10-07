@@ -1,0 +1,28 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Locally imported Hansker vendor resources. These are intentionally not
+# redistributed by this project.
+.vendor/
+firmware.bin
+packets_performance.json
+phase1_packets.json
+HanskerFirmwareUpdater.dmg
+HanskerFirmwareUpdater*.dmg
+FW-HanskerPer-*.zip
+
+# Firmware-update logs / local diagnostics
+hansker-linux-flash-*.log
+hansker-first-linux-*.log
+*.usbmon
+uv.lock
+.apply-publish-cleanup.sh

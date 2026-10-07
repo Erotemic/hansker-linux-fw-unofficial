@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON="$HERE/.venv/bin/python"
+if [[ ! -x "$PYTHON" ]]; then
+    echo "Missing $PYTHON" >&2
+    echo "Run: uv sync" >&2
+    exit 2
+fi
+exec "$PYTHON" -m hansker_updater "$@"
