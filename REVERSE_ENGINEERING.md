@@ -28,7 +28,7 @@ MS1000V2.23H
 
 The USB descriptor still reports `bcdDevice=2.05`; it is not the running firmware version.
 
-## Read-only version query
+## Non-committing version query
 
 The generic SINO WEALTH `05 01 ...` query is not sufficient on this mouse. The updater's working query is:
 
@@ -109,6 +109,9 @@ ISP-enter                       sent
 The device then changed from `258a:0136` to `0603:1020` about one second after ISP-enter.
 
 ## Linux control-only ISP bootloader gotcha
+
+`0603:1020` is a generic SINO WEALTH ISP identity and does not carry a Hansker-specific product string. The full updater therefore refuses to begin if such a bootloader is already present before Stage 1. This prevents a pre-existing unrelated ISP device from being mistaken for the Hansker after re-enumeration. Stage-2-only recovery is intentionally explicit and should be used only when the operator knows the Hansker is the device that entered ISP mode.
+
 
 The first implementation incorrectly searched for `0603:1020` through `hidapi`. The device was actually present, but Linux logged:
 

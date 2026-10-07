@@ -39,6 +39,28 @@ class TestVendorResources(unittest.TestCase):
             with self.assertRaises(vendor.VendorResourceError):
                 vendor.import_vendor_resources(root, root / "dest")
 
+
+    def test_bad_dmg_hash_is_rejected_before_extraction(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dmg = root / "HanskerFirmwareUpdater.dmg"
+            dmg.write_bytes(b"not the official dmg")
+            with mock.patch.object(vendor.subprocess, "run") as run_mock, mock.patch.object(
+                vendor.shutil, "which", return_value="/usr/bin/7zz"
+            ) as which_mock:
+                with self.assertRaisesRegex(vendor.VendorResourceError, "unrecognized DMG"):
+                    vendor.import_vendor_resources(dmg, root / "dest")
+            run_mock.assert_not_called()
+            which_mock.assert_not_called()
+
+    def test_generic_archives_are_not_extracted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            archive = root / "payload.zip"
+            archive.write_bytes(b"not used")
+            with self.assertRaisesRegex(vendor.VendorResourceError, "unsupported import source"):
+                vendor.import_vendor_resources(archive, root / "dest")
+
     def test_vendor_payloads_are_not_in_package_tree(self):
         package_root = Path(vendor.__file__).resolve().parent
         self.assertFalse((package_root / "resources" / vendor.FIRMWARE_FILENAME).exists())

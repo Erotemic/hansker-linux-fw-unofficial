@@ -82,6 +82,39 @@ class TestResources(unittest.TestCase):
         self.assertGreater(p.IDX_ENTER_ISP, p.IDX_POST_COMMIT)
 
 
+class TestNormalDeviceSelection(unittest.TestCase):
+    def test_multiple_performance_mice_are_rejected(self):
+        devices = [
+            {"product_string": "Hansker Per", "interface_number": 0, "path": b"/dev/hidraw10"},
+            {"product_string": "Hansker Per", "interface_number": 1, "path": b"/dev/hidraw11"},
+            {"product_string": "Hansker Per", "interface_number": 0, "path": b"/dev/hidraw20"},
+            {"product_string": "Hansker Per", "interface_number": 1, "path": b"/dev/hidraw21"},
+        ]
+
+        class FakeHid:
+            @staticmethod
+            def enumerate(_vid, _pid):
+                return devices
+
+        with mock.patch.object(p, "_import_hid", return_value=FakeHid):
+            with self.assertRaisesRegex(p.DeviceError, "multiple Hansker Performance"):
+                p.find_normal_device()
+
+    def test_unvalidated_hansker_product_string_is_rejected(self):
+        devices = [
+            {"product_string": "Hansker Future", "interface_number": 1, "path": b"/dev/hidraw11"},
+        ]
+
+        class FakeHid:
+            @staticmethod
+            def enumerate(_vid, _pid):
+                return devices
+
+        with mock.patch.object(p, "_import_hid", return_value=FakeHid):
+            with self.assertRaisesRegex(p.DeviceError, "unvalidated Hansker product"):
+                p.find_normal_device()
+
+
 class TestPolling(unittest.TestCase):
     def test_wait_ready_returns_first_nonbusy(self):
         dev = FakeFeatureDevice(r5=[

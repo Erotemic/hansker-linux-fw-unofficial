@@ -22,6 +22,7 @@ NORMAL_PID = 0x0136
 ISP_VID = 0x0603
 ISP_PID = 0x1020
 TARGET_VERSION = "MS1000V2.23"
+NORMAL_PRODUCT = "Hansker Per"
 
 REPORT_CMD = 0x05
 REPORT_XFER = 0x06
@@ -248,27 +249,35 @@ def find_normal_device() -> NormalDevicePaths:
     hid = _import_hid()
     devices = hid.enumerate(NORMAL_VID, NORMAL_PID)
     candidates: list[dict] = []
+    unexpected_products: set[str] = set()
     for dev in devices:
         product = dev.get("product_string") or ""
-        if product.startswith("Hansker") and not product.startswith("Hansker Pro"):
+        if product == NORMAL_PRODUCT:
             candidates.append(dev)
+        elif product.startswith("Hansker"):
+            unexpected_products.add(product)
     if not candidates:
+        if unexpected_products:
+            names = ", ".join(repr(x) for x in sorted(unexpected_products))
+            raise DeviceError(
+                f"found unvalidated Hansker product string(s) at {NORMAL_VID:04x}:{NORMAL_PID:04x}: "
+                f"{names}; only {NORMAL_PRODUCT!r} is supported"
+            )
         raise DeviceError("Hansker Performance 258a:0136 not found")
 
-    iface0 = None
-    iface1 = None
-    product = ""
-    for dev in candidates:
-        product = dev.get("product_string") or product
-        n = dev.get("interface_number")
-        path = dev.get("path")
-        if n == 0 and path is not None and iface0 is None:
-            iface0 = path
-        if n == 1 and path is not None and iface1 is None:
-            iface1 = path
-    if iface1 is None:
+    iface0_paths = sorted({dev.get("path") for dev in candidates if dev.get("interface_number") == 0 and dev.get("path")})
+    iface1_paths = sorted({dev.get("path") for dev in candidates if dev.get("interface_number") == 1 and dev.get("path")})
+
+    if len(iface1_paths) == 0:
         raise DeviceError("Hansker interface 1 (vendor control interface) not found")
-    return NormalDevicePaths(iface0=iface0, iface1=iface1, product=product)
+    if len(iface1_paths) > 1 or len(iface0_paths) > 1:
+        raise DeviceError(
+            "multiple Hansker Performance devices are connected; disconnect all but the one being updated"
+        )
+
+    iface0 = iface0_paths[0] if iface0_paths else None
+    iface1 = iface1_paths[0]
+    return NormalDevicePaths(iface0=iface0, iface1=iface1, product=NORMAL_PRODUCT)
 
 
 def _import_usb():

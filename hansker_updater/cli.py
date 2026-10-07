@@ -120,8 +120,21 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     direct, explanation = usb_topology(paths.iface1)
     print(f"USB topology: {explanation}")
-    if direct is False and not args.allow_hub:
-        print("ERROR: mouse is behind a USB hub/adapter; direct USB-C is required for flashing", file=sys.stderr)
+    if direct is not True and not args.allow_hub:
+        if direct is False:
+            detail = "mouse is behind a USB hub/adapter"
+        else:
+            detail = "USB topology could not be verified"
+        print(f"ERROR: {detail}; direct USB-C is required for flashing", file=sys.stderr)
+        return 2
+
+    existing_isp = find_isp_location()
+    if existing_isp is not None:
+        print(
+            "ERROR: a generic 0603:1020 SINO WEALTH ISP bootloader is already connected at "
+            f"{existing_isp.describe()}; disconnect/recover it before a full flash",
+            file=sys.stderr,
+        )
         return 2
 
     openers = find_hidraw_openers(paths.iface1)
@@ -190,6 +203,7 @@ def _confirm_recover_isp(args: argparse.Namespace) -> None:
     print()
     print("ISP RECOVERY / STAGE-2 FLASH")
     print("- This is only for a mouse already enumerating as 0603:1020.")
+    print("- 0603:1020 is a generic SINO WEALTH bootloader identity; disconnect other such devices.")
     print("- It skips the C9/CB main-firmware stage entirely.")
     print("- Keep the cable connected until the command finishes.")
     print("- It erases and rewrites the secondary 0x7000-byte firmware region.")
@@ -260,8 +274,21 @@ def cmd_flash(args: argparse.Namespace) -> int:
 
     direct, explanation = usb_topology(paths.iface1)
     print(f"USB topology: {explanation}")
-    if direct is False and not args.allow_hub:
-        raise UpdateError("refusing to flash through a USB hub/adapter; use a direct USB-C port")
+    if direct is not True and not args.allow_hub:
+        if direct is False:
+            raise UpdateError("refusing to flash through a USB hub/adapter; use a direct USB-C port")
+        raise UpdateError(
+            "refusing to flash because USB topology could not be verified; "
+            "use a direct USB-C port or explicitly override with --allow-hub"
+        )
+
+    existing_isp = find_isp_location()
+    if existing_isp is not None:
+        raise UpdateError(
+            "a 0603:1020 SINO WEALTH ISP bootloader is already connected at "
+            f"{existing_isp.describe()}; refusing full flash because that generic bootloader "
+            "cannot be proven to belong to this Hansker. Disconnect/recover it first."
+        )
 
     openers = find_hidraw_openers(paths.iface1)
     if openers and not args.ignore_openers:
@@ -356,7 +383,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("flash", help="perform the full v2.23 update")
     p.add_argument("--yes", action="store_true", help="skip the interactive destructive-action confirmation")
-    p.add_argument("--allow-hub", action="store_true", help="allow flashing through a USB hub (not recommended)")
+    p.add_argument("--allow-hub", action="store_true", help="override the direct-USB topology safety check (not recommended)")
     p.add_argument("--ignore-openers", action="store_true", help="ignore userspace processes holding the control hidraw node")
     p.add_argument("--no-root-check", action="store_true", help=argparse.SUPPRESS)
     p.add_argument("--max-attempts", type=int, default=3, choices=range(1, 4), metavar="N")

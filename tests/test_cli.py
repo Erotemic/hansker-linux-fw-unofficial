@@ -36,6 +36,50 @@ class TestCli(unittest.TestCase):
         ), mock.patch.object(cli.os, "geteuid", return_value=0):
             self.assertEqual(cli.main(["recover-isp", "--yes"]), 1)
 
+
+
+    def test_doctor_refuses_preexisting_generic_isp(self):
+        resources = synthetic_resources()
+        paths = cli.find_normal_device.__globals__["NormalDevicePaths"](
+            b"/dev/hidraw10", b"/dev/hidraw11", "Hansker Per"
+        )
+        loc = cli.find_isp_location.__globals__["UsbLocation"](1, 30, 0)
+        with mock.patch.object(cli, "load_resources", return_value=resources), mock.patch.object(
+            cli, "find_normal_device", return_value=paths
+        ), mock.patch.object(cli, "usb_topology", return_value=(True, "direct to host/root hub")), mock.patch.object(
+            cli, "find_isp_location", return_value=loc
+        ):
+            self.assertEqual(cli.main(["doctor"]), 2)
+
+    def test_flash_refuses_preexisting_generic_isp(self):
+        resources = synthetic_resources()
+        paths = cli.find_normal_device.__globals__["NormalDevicePaths"](
+            b"/dev/hidraw10", b"/dev/hidraw11", "Hansker Per"
+        )
+        loc = cli.find_isp_location.__globals__["UsbLocation"](1, 30, 0)
+        with mock.patch.object(cli, "load_resources", return_value=resources), mock.patch.object(
+            cli, "find_normal_device", return_value=paths
+        ), mock.patch.object(cli, "usb_topology", return_value=(True, "direct to host/root hub")), mock.patch.object(
+            cli, "find_isp_location", return_value=loc
+        ), mock.patch.object(cli.os, "geteuid", return_value=0), mock.patch.object(
+            cli, "flash_full"
+        ) as flash_mock:
+            self.assertEqual(cli.main(["flash", "--yes"]), 1)
+        flash_mock.assert_not_called()
+
+    def test_flash_refuses_unknown_topology_by_default(self):
+        resources = synthetic_resources()
+        paths = cli.find_normal_device.__globals__["NormalDevicePaths"](
+            b"/dev/hidraw10", b"/dev/hidraw11", "Hansker Per"
+        )
+        with mock.patch.object(cli, "load_resources", return_value=resources), mock.patch.object(
+            cli, "find_normal_device", return_value=paths
+        ), mock.patch.object(cli, "usb_topology", return_value=(None, "unknown")), mock.patch.object(
+            cli.os, "geteuid", return_value=0
+        ), mock.patch.object(cli, "flash_full") as flash_mock:
+            self.assertEqual(cli.main(["flash", "--yes"]), 1)
+        flash_mock.assert_not_called()
+
     def test_recover_confirmation_is_short(self):
         args = argparse.Namespace(yes=False)
         with mock.patch("builtins.input", return_value="RECOVER HANSKER") as input_mock:

@@ -6,7 +6,8 @@ firmware, packet captures containing firmware bytes, the official updater, or
 Hansker artwork.
 
 Users obtain the required firmware resources from Hansker's official updater
-and import them locally with `hansker-fw import-resources`. Those imported
+and import them locally with `hansker-fw import-resources`. The importer verifies
+the pinned official v2.23 DMG SHA-256 before invoking 7-Zip. Those imported
 files are kept under `.vendor/` in a source checkout and are ignored by Git.
 They remain subject to whatever rights and terms apply to the vendor material.
 

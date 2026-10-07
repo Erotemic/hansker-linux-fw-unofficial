@@ -13,6 +13,7 @@ FIRMWARE_FILENAME = "firmware.bin"
 PACKETS_FILENAME = "packets_performance.json"
 FIRMWARE_SHA256 = "b932769f06425db7243db17f7ba0464fe8bae6123e3881dcb897c9cf78b76ba4"
 PACKETS_SHA256 = "c4e867ec0b2a9ba32d7129ec560badd3bae2959f48b7d653036a793f1c7252ee"
+OFFICIAL_DMG_SHA256 = "6bac5d6d0c00b2674accb3413752249d328f185197f24149467fd03e6ae1dbcc"
 TARGET_RESOURCE_VERSION = "v2.23"
 
 
@@ -126,12 +127,17 @@ def _extract_source(source: Path, destination: Path) -> Path:
     if not source.is_file():
         raise VendorResourceError(f"source does not exist: {source}")
 
-    suffixes = "".join(source.suffixes).lower()
     if source.suffix.lower() == ".dmg":
+        digest = sha256_file(source)
+        if digest != OFFICIAL_DMG_SHA256:
+            raise VendorResourceError(
+                "refusing to extract an unrecognized DMG: "
+                f"SHA-256 {digest} != expected official v2.23 {OFFICIAL_DMG_SHA256}"
+            )
         sevenzip = shutil.which("7zz") or shutil.which("7z")
         if sevenzip is None:
             raise VendorResourceError(
-                "extracting a .dmg requires a 7-Zip command named '7zz' or '7z'. "
+                "extracting the official .dmg requires a 7-Zip command named '7zz' or '7z'. "
                 "Install 7-Zip, or pass an already-extracted Hansker updater directory."
             )
         command = [sevenzip, "x", "-y", f"-o{destination}", str(source)]
@@ -141,14 +147,10 @@ def _extract_source(source: Path, destination: Path) -> Path:
             raise VendorResourceError(f"7-Zip failed to extract {source}:\n{tail}")
         return destination
 
-    try:
-        shutil.unpack_archive(str(source), str(destination))
-    except (shutil.ReadError, ValueError) as ex:
-        raise VendorResourceError(
-            f"unsupported archive format for {source}; pass a .dmg, a zip/tar archive, "
-            "or an already-extracted updater directory"
-        ) from ex
-    return destination
+    raise VendorResourceError(
+        f"unsupported import source {source}; pass Hansker's verified "
+        "HanskerFirmwareUpdater.dmg or an already-extracted updater directory"
+    )
 
 
 def import_vendor_resources(source: Path, destination: Path | None = None) -> ImportedResources:

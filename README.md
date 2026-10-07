@@ -4,7 +4,7 @@
 
 Linux firmware updater for the **Hansker Performance / HK95** mouse (`258a:0136`), reconstructed from Hansker's official v2.23 updater.
 
-The updater has been validated end-to-end on one physical Hansker Performance unit upgraded from `MS1000V2.07H` to `MS1000V2.23H` on Ubuntu Linux. The first Linux hardware run also exercised the `0603:1020` ISP recovery path and verified all `0x7000` bytes of the secondary image before rebooting.
+**Status: experimental, one-device hardware validation.** The complete Linux update procedure was validated on one physical Hansker Performance unit upgraded from `MS1000V2.07H` to `MS1000V2.23H` on Ubuntu Linux. The first run completed Stage 1 and entered `0603:1020`, but an earlier Linux detector incorrectly reported the control-only bootloader as absent; Stage 2 was then completed with the raw-USB recovery path, which verified all `0x7000` bytes before rebooting. The current full command combines those two hardware-validated paths, but it has not been destructively re-run on a second mouse merely to prove one-process continuity.
 
 This repository intentionally contains **no Hansker firmware or captured firmware payloads**. Users import the required resources locally from Hansker's official updater; the importer verifies known-good SHA-256 hashes before any firmware operation can run.
 
@@ -24,8 +24,9 @@ The protocol is destructive and can brick the device if interrupted. Keep the US
 
 The updater deliberately adds checks around the dangerous parts of the vendor protocol:
 
-- Supports only the Performance/HK95 product string, not Productivity/HK25.
-- Requires locally imported vendor resources to match known SHA-256 hashes.
+- Supports only the physically validated Performance/HK95 product string `Hansker Per`, not Productivity/HK25 or future same-VID/PID devices.
+- Refuses to flash when multiple Hansker Performance devices are connected.
+- Requires locally imported vendor resources to match known SHA-256 hashes; the official DMG is authenticated before 7-Zip is invoked.
 - Never sends `05 c9 70` (commit) until every CB firmware packet has been sent.
 - Requires the C9 commit status to stabilize for about 400 ms as either `0x00` (healthy) or `0xff` (session dropped). An ambiguous commit state aborts before ISP entry.
 - Uses the observed 8 s packet timeout and 45 s post-commit timeout behavior.
@@ -34,7 +35,8 @@ The updater deliberately adds checks around the dangerous parts of the vendor pr
 - Uses raw USB control transfers for `0603:1020`; Linux may not create a `hidraw` node for this control-only bootloader.
 - Checks for other userspace processes already holding the normal mouse control `hidraw` node.
 - Refuses an external USB hub/adapter by default.
-- Has a dedicated `recover-isp` path that refuses to replay Stage 1 when the device is already in `0603:1020`.
+- Refuses a full flash if a generic `0603:1020` SINO WEALTH bootloader is already connected, preventing a pre-existing unrelated bootloader from being mistaken for the Hansker.
+- Has a dedicated `recover-isp` path that refuses to replay Stage 1 when the device is already in `0603:1020`. Because `0603:1020` is generic and carries no Hansker product string, recovery must be used only when you know the Hansker is the device in ISP mode.
 
 ## Install
 
@@ -97,8 +99,7 @@ On Ubuntu 24.04 install 7-Zip once:
 sudo apt install 7zip
 ```
 
-Then let the updater extract the DMG, locate the two required resources, verify
-their hashes, and copy them into the ignored local vendor directory:
+Then let the updater first verify the **official DMG SHA-256**, extract it, locate the two required resources, verify their individual hashes, and copy them into the ignored local vendor directory:
 
 ```bash
 ./hansker-fw import-resources ~/Downloads/HanskerFirmwareUpdater.dmg
@@ -267,7 +268,7 @@ The confirmation phrase is deliberately short:
 RECOVER HANSKER
 ```
 
-`recover-isp` refuses to run unless `0603:1020` is already present. It does not send C9 open, CB main-firmware packets, or the C9 commit. Like the normal flash path, it skips the final C9 version probe by default; add `--post-probe` only when you specifically want that diagnostic.
+`recover-isp` refuses to run unless `0603:1020` is already present. **That VID:PID is a generic SINO WEALTH bootloader identity, not proof that the device is a Hansker**, so disconnect other devices that could be in the same bootloader and use recovery only when you know your Hansker just entered ISP mode. It does not send C9 open, CB main-firmware packets, or the C9 commit. Like the normal flash path, it skips the final C9 version probe by default; add `--post-probe` only when you specifically want that diagnostic.
 
 ## Update pipeline
 
