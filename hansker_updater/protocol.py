@@ -870,73 +870,24 @@ def flash_full(
 
 
 def find_hidraw_openers(path: bytes | str) -> list[tuple[int, str]]:
-    target = os.fsdecode(path)
-    result: list[tuple[int, str]] = []
-    self_pid = os.getpid()
-    proc = Path("/proc")
-    if not proc.exists():
-        return result
-    for child in proc.iterdir():
-        if not child.name.isdigit():
-            continue
-        pid = int(child.name)
-        if pid == self_pid:
-            continue
-        fd_dir = child / "fd"
-        try:
-            fds = list(fd_dir.iterdir())
-        except (OSError, PermissionError):
-            continue
-        hit = False
-        for fd in fds:
-            try:
-                dest = os.readlink(fd)
-            except OSError:
-                continue
-            if dest == target:
-                hit = True
-                break
-        if hit:
-            try:
-                comm = (child / "comm").read_text().strip()
-            except OSError:
-                comm = "?"
-            result.append((pid, comm))
-    return sorted(result)
+    """Detect openers for either the Linux HIDAPI hidraw or libusb backend."""
+    from . import linux_usb
+
+    try:
+        return linux_usb.find_hidraw_openers(
+            path, expected_vid=NORMAL_VID, expected_pid=NORMAL_PID
+        )
+    except linux_usb.UsbInspectionError as ex:
+        raise DeviceError(f"could not verify USB device openers: {ex}") from ex
 
 
 def usb_topology(path: bytes | str) -> tuple[bool | None, str]:
-    """Return (direct_to_root_hub, explanation) using Linux sysfs."""
-    name = Path(os.fsdecode(path)).name
-    sys = Path("/sys/class/hidraw") / name / "device"
-    try:
-        current = sys.resolve()
-    except OSError as ex:
-        return None, f"could not resolve sysfs topology: {ex}"
+    """Check that the matching mouse is directly attached to the root hub."""
+    from . import linux_usb
 
-    usb_nodes = []
-    for parent in [current, *current.parents]:
-        if (parent / "idVendor").exists() and (parent / "idProduct").exists():
-            try:
-                vid = (parent / "idVendor").read_text().strip()
-                pid = (parent / "idProduct").read_text().strip()
-                cls = (parent / "bDeviceClass").read_text().strip() if (parent / "bDeviceClass").exists() else ""
-            except OSError:
-                continue
-            usb_nodes.append((parent.name, vid, pid, cls))
-    if not usb_nodes:
-        return None, "USB device ancestry not found in sysfs"
-
-    # Linux names the root hub itself "usbN" and reports it as class 09.
-    # That root hub is not an external hub/adapter. Any other class-09 USB
-    # ancestor between the mouse and root hub is an actual intermediate hub.
-    intermediates = [
-        n for n in usb_nodes[1:]
-        if n[3].lower() == "09" and not n[0].startswith("usb")
-    ]
-    if intermediates:
-        return False, "via USB hub(s): " + ", ".join(n[0] for n in intermediates)
-    return True, "direct to host/root hub"
+    return linux_usb.usb_topology(
+        path, expected_vid=NORMAL_VID, expected_pid=NORMAL_PID
+    )
 
 
 def describe_plan(resources: Resources) -> list[str]:
